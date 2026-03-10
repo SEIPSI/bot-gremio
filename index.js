@@ -37,7 +37,7 @@ const MONTHLY_ROLE_ORDER = Object.freeze([
   { key: 'guerrero', label: 'Guerrero del Mes' }
 ]);
 
-const DATA_FILE_PATH = path.resolve(process.cwd(), 'data.json');
+const DATA_FILE_PATH = '/data/data.json';
 
 function createInitialData() {
   return {
@@ -751,5 +751,6 @@ client.login(config.token).catch((error) => {
   console.error('No se pudo iniciar sesion en Discord:', error);
   process.exit(1);
 });
+
 
 
