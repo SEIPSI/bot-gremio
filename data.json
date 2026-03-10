@@ -1,0 +1,306 @@
+{
+  "users": {
+    "714621203700252682": {
+      "discord_user_id": "714621203700252682",
+      "username": "Darkor",
+      "total_points": 21,
+      "monthly_points": 21,
+      "created_at": "2026-03-10T03:52:56.917Z",
+      "updated_at": "2026-03-10T18:24:47.659Z"
+    },
+    "471776582793691151": {
+      "discord_user_id": "471776582793691151",
+      "username": "Marijove",
+      "total_points": 13,
+      "monthly_points": 13,
+      "created_at": "2026-03-10T03:52:56.918Z",
+      "updated_at": "2026-03-10T13:47:14.155Z"
+    },
+    "870007088162668607": {
+      "discord_user_id": "870007088162668607",
+      "username": "hohen6376",
+      "total_points": 8,
+      "monthly_points": 8,
+      "created_at": "2026-03-10T13:47:14.152Z",
+      "updated_at": "2026-03-10T13:47:14.155Z"
+    },
+    "1455665361155260416": {
+      "discord_user_id": "1455665361155260416",
+      "username": "Juan David C",
+      "total_points": 8,
+      "monthly_points": 8,
+      "created_at": "2026-03-10T14:55:21.286Z",
+      "updated_at": "2026-03-10T14:55:21.286Z"
+    },
+    "523947603185106964": {
+      "discord_user_id": "523947603185106964",
+      "username": "Samte [Talkasha]",
+      "total_points": 14,
+      "monthly_points": 14,
+      "created_at": "2026-03-10T14:56:59.849Z",
+      "updated_at": "2026-03-10T18:57:04.523Z"
+    },
+    "415983122585223189": {
+      "discord_user_id": "415983122585223189",
+      "username": "ChinoNino",
+      "total_points": 13,
+      "monthly_points": 13,
+      "created_at": "2026-03-10T14:56:59.849Z",
+      "updated_at": "2026-03-10T19:13:12.044Z"
+    },
+    "769003521555038208": {
+      "discord_user_id": "769003521555038208",
+      "username": "brayan0524",
+      "total_points": 30,
+      "monthly_points": 30,
+      "created_at": "2026-03-10T16:11:10.658Z",
+      "updated_at": "2026-03-10T18:57:04.523Z"
+    },
+    "846123503505113129": {
+      "discord_user_id": "846123503505113129",
+      "username": "kiyi",
+      "total_points": 8,
+      "monthly_points": 8,
+      "created_at": "2026-03-10T18:24:47.659Z",
+      "updated_at": "2026-03-10T18:24:47.659Z"
+    },
+    "1340895346066198648": {
+      "discord_user_id": "1340895346066198648",
+      "username": "David Oca",
+      "total_points": 16,
+      "monthly_points": 16,
+      "created_at": "2026-03-10T19:41:38.866Z",
+      "updated_at": "2026-03-10T19:42:00.769Z"
+    },
+    "650345400452251659": {
+      "discord_user_id": "650345400452251659",
+      "username": "Donko",
+      "total_points": 8,
+      "monthly_points": 8,
+      "created_at": "2026-03-10T19:41:38.866Z",
+      "updated_at": "2026-03-10T19:41:38.866Z"
+    },
+    "651609936287236110": {
+      "discord_user_id": "651609936287236110",
+      "username": "FelixCruz",
+      "total_points": 16,
+      "monthly_points": 16,
+      "created_at": "2026-03-10T20:25:51.358Z",
+      "updated_at": "2026-03-10T21:13:58.700Z"
+    },
+    "1457839788915822798": {
+      "discord_user_id": "1457839788915822798",
+      "username": "Bryjhan (Xcalybur)",
+      "total_points": 8,
+      "monthly_points": 8,
+      "created_at": "2026-03-10T21:13:58.701Z",
+      "updated_at": "2026-03-10T21:13:58.701Z"
+    }
+  },
+  "activity_logs": {
+    "1480775447535947848": {
+      "message_id": "1480775447535947848",
+      "channel_id": "1480690513832181830",
+      "guild_id": "1058160349129482380",
+      "author_id": "714621203700252682",
+      "activity_type": "mazmorra",
+      "mentioned_user_ids": [
+        "471776582793691151"
+      ],
+      "author_points": 5,
+      "points_per_mention": 5,
+      "total_points_awarded": 10,
+      "contains_armada": false,
+      "created_at": "2026-03-10T03:52:56.918Z"
+    },
+    "1480925001367552152": {
+      "message_id": "1480925001367552152",
+      "channel_id": "1480690513832181830",
+      "guild_id": "1058160349129482380",
+      "author_id": "870007088162668607",
+      "activity_type": "encargo",
+      "mentioned_user_ids": [
+        "471776582793691151"
+      ],
+      "author_points": 8,
+      "points_per_mention": 8,
+      "total_points_awarded": 16,
+      "contains_armada": false,
+      "created_at": "2026-03-10T13:47:14.155Z"
+    },
+    "1480927038708650146": {
+      "message_id": "1480927038708650146",
+      "channel_id": "1480690513832181830",
+      "guild_id": "1058160349129482380",
+      "author_id": "714621203700252682",
+      "activity_type": "encargo",
+      "mentioned_user_ids": [],
+      "author_points": 8,
+      "points_per_mention": 8,
+      "total_points_awarded": 8,
+      "contains_armada": false,
+      "created_at": "2026-03-10T13:55:19.848Z"
+    },
+    "1480942144616403056": {
+      "message_id": "1480942144616403056",
+      "channel_id": "1480690513832181830",
+      "guild_id": "1058160349129482380",
+      "author_id": "1455665361155260416",
+      "activity_type": "encargo",
+      "mentioned_user_ids": [],
+      "author_points": 8,
+      "points_per_mention": 8,
+      "total_points_awarded": 8,
+      "contains_armada": false,
+      "created_at": "2026-03-10T14:55:21.286Z"
+    },
+    "1480942557826384065": {
+      "message_id": "1480942557826384065",
+      "channel_id": "1480690513832181830",
+      "guild_id": "1058160349129482380",
+      "author_id": "523947603185106964",
+      "activity_type": "encargo",
+      "mentioned_user_ids": [
+        "415983122585223189"
+      ],
+      "author_points": 8,
+      "points_per_mention": 8,
+      "total_points_awarded": 16,
+      "contains_armada": false,
+      "created_at": "2026-03-10T14:56:59.849Z"
+    },
+    "1480961219161755729": {
+      "message_id": "1480961219161755729",
+      "channel_id": "1480690513832181830",
+      "guild_id": "1058160349129482380",
+      "author_id": "769003521555038208",
+      "activity_type": "encargo",
+      "mentioned_user_ids": [],
+      "author_points": 8,
+      "points_per_mention": 8,
+      "total_points_awarded": 8,
+      "contains_armada": false,
+      "created_at": "2026-03-10T16:11:10.658Z"
+    },
+    "1480987364510793789": {
+      "message_id": "1480987364510793789",
+      "channel_id": "1480690513832181830",
+      "guild_id": "1058160349129482380",
+      "author_id": "769003521555038208",
+      "activity_type": "encargo",
+      "mentioned_user_ids": [],
+      "author_points": 8,
+      "points_per_mention": 8,
+      "total_points_awarded": 8,
+      "contains_armada": false,
+      "created_at": "2026-03-10T17:55:02.272Z"
+    },
+    "1480994853847564459": {
+      "message_id": "1480994853847564459",
+      "channel_id": "1480690513832181830",
+      "guild_id": "1058160349129482380",
+      "author_id": "714621203700252682",
+      "activity_type": "encargo",
+      "mentioned_user_ids": [
+        "769003521555038208",
+        "846123503505113129"
+      ],
+      "author_points": 8,
+      "points_per_mention": 8,
+      "total_points_awarded": 24,
+      "contains_armada": false,
+      "created_at": "2026-03-10T18:24:47.659Z"
+    },
+    "1481002972552101890": {
+      "message_id": "1481002972552101890",
+      "channel_id": "1480690513832181830",
+      "guild_id": "1058160349129482380",
+      "author_id": "523947603185106964",
+      "activity_type": "rookie",
+      "mentioned_user_ids": [
+        "769003521555038208"
+      ],
+      "author_points": 6,
+      "points_per_mention": 6,
+      "total_points_awarded": 12,
+      "contains_armada": false,
+      "created_at": "2026-03-10T18:57:04.523Z"
+    },
+    "1481007029479800988": {
+      "message_id": "1481007029479800988",
+      "channel_id": "1480690513832181830",
+      "guild_id": "1058160349129482380",
+      "author_id": "415983122585223189",
+      "activity_type": "mazmorra",
+      "mentioned_user_ids": [],
+      "author_points": 5,
+      "points_per_mention": 5,
+      "total_points_awarded": 5,
+      "contains_armada": false,
+      "created_at": "2026-03-10T19:13:12.044Z"
+    },
+    "1481014189345472625": {
+      "message_id": "1481014189345472625",
+      "channel_id": "1480690513832181830",
+      "guild_id": "1058160349129482380",
+      "author_id": "1340895346066198648",
+      "activity_type": "encargo",
+      "mentioned_user_ids": [
+        "650345400452251659"
+      ],
+      "author_points": 8,
+      "points_per_mention": 8,
+      "total_points_awarded": 16,
+      "contains_armada": false,
+      "created_at": "2026-03-10T19:41:38.866Z"
+    },
+    "1481014281398124756": {
+      "message_id": "1481014281398124756",
+      "channel_id": "1480690513832181830",
+      "guild_id": "1058160349129482380",
+      "author_id": "1340895346066198648",
+      "activity_type": "encargo",
+      "mentioned_user_ids": [],
+      "author_points": 0,
+      "points_per_mention": 0,
+      "total_points_awarded": 0,
+      "contains_armada": false,
+      "created_at": "2026-03-10T19:42:00.769Z"
+    },
+    "1481025315437412352": {
+      "message_id": "1481025315437412352",
+      "channel_id": "1480690513832181830",
+      "guild_id": "1058160349129482380",
+      "author_id": "651609936287236110",
+      "activity_type": "encargo",
+      "mentioned_user_ids": [],
+      "author_points": 8,
+      "points_per_mention": 8,
+      "total_points_awarded": 8,
+      "contains_armada": false,
+      "created_at": "2026-03-10T20:25:51.359Z"
+    },
+    "1481037426368450670": {
+      "message_id": "1481037426368450670",
+      "channel_id": "1480690513832181830",
+      "guild_id": "1058160349129482380",
+      "author_id": "651609936287236110",
+      "activity_type": "encargo",
+      "mentioned_user_ids": [
+        "1457839788915822798"
+      ],
+      "author_points": 8,
+      "points_per_mention": 8,
+      "total_points_awarded": 16,
+      "contains_armada": false,
+      "created_at": "2026-03-10T21:13:58.701Z"
+    }
+  },
+  "monthly_snapshots": [],
+  "monthly_resets": [],
+  "monthly_role_holders": {
+    "paladin": null,
+    "heroe": null,
+    "guerrero": null
+  }
+}
