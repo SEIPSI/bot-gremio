@@ -2,7 +2,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
-const { Client, GatewayIntentBits } = require('discord.js');
+const { ChannelType, Client, GatewayIntentBits } = require('discord.js');
 
 const MAIN_KEYWORDS = Object.freeze({
   encargo: '#encargo',
@@ -204,6 +204,21 @@ function hasBonusKeyword(content) {
   return countOccurrences(content, BONUS_KEYWORD) > 0;
 }
 
+function getCurrentDayKey() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function getDayDifference(previousDay, currentDay) {
+  const previousDate = new Date(`${previousDay}T00:00:00Z`);
+  const currentDate = new Date(`${currentDay}T00:00:00Z`);
+
+  if (Number.isNaN(previousDate.getTime()) || Number.isNaN(currentDate.getTime())) {
+    return null;
+  }
+
+  return Math.floor((currentDate.getTime() - previousDate.getTime()) / (1000 * 60 * 60 * 24));
+}
+
 function getDisplayName(user) {
   return user.globalName || user.username || user.tag || user.id;
 }
@@ -244,6 +259,10 @@ function ensureUser(userId, username) {
       username,
       total_points: 0,
       monthly_points: 0,
+      streak: 0,
+      best_streak: 0,
+      last_active_day: null,
+      last_streak_bonus_day: null,
       created_at: now,
       updated_at: now
     };
@@ -251,7 +270,26 @@ function ensureUser(userId, username) {
   }
 
   store.users[userId].username = username;
+  ensureUserStreakFields(store.users[userId]);
   store.users[userId].updated_at = now;
+}
+
+function ensureUserStreakFields(userRow) {
+  if (typeof userRow.streak !== 'number') {
+    userRow.streak = 0;
+  }
+
+  if (typeof userRow.best_streak !== 'number') {
+    userRow.best_streak = 0;
+  }
+
+  if (typeof userRow.last_active_day !== 'string' && userRow.last_active_day !== null) {
+    userRow.last_active_day = null;
+  }
+
+  if (typeof userRow.last_streak_bonus_day !== 'string' && userRow.last_streak_bonus_day !== null) {
+    userRow.last_streak_bonus_day = null;
+  }
 }
 
 function addPoints(userId, username, points) {
@@ -263,6 +301,69 @@ function addPoints(userId, username, points) {
   store.users[userId].total_points += points;
   store.users[userId].monthly_points += points;
   store.users[userId].updated_at = new Date().toISOString();
+}
+
+function processUserActivityStreak(data, userId) {
+  const now = new Date().toISOString();
+  const today = getCurrentDayKey();
+
+  // Garantiza compatibilidad con usuarios nuevos o migrados de versiones anteriores.
+  if (!data.users[userId]) {
+    data.users[userId] = {
+      discord_user_id: userId,
+      username: userId,
+      total_points: 0,
+      monthly_points: 0,
+      streak: 0,
+      best_streak: 0,
+      last_active_day: null,
+      last_streak_bonus_day: null,
+      created_at: now,
+      updated_at: now
+    };
+  }
+
+  const userRow = data.users[userId];
+  ensureUserStreakFields(userRow);
+
+  // Solo permite una actualización de racha por día.
+  if (userRow.last_active_day === today) {
+    return {
+      streakUpdated: false,
+      bonusGranted: 0,
+      streak: userRow.streak
+    };
+  }
+
+  const dayDifference = userRow.last_active_day
+    ? getDayDifference(userRow.last_active_day, today)
+    : null;
+
+  if (dayDifference === 1) {
+    userRow.streak += 1;
+  } else {
+    userRow.streak = 1;
+  }
+
+  if (userRow.streak > userRow.best_streak) {
+    userRow.best_streak = userRow.streak;
+  }
+
+  userRow.last_active_day = today;
+
+  let bonusGranted = 0;
+  if (userRow.streak % 5 === 0 && userRow.last_streak_bonus_day !== today) {
+    bonusGranted = 10;
+    userRow.last_streak_bonus_day = today;
+  }
+
+  userRow.updated_at = now;
+
+  return {
+    streakUpdated: true,
+    bonusGranted,
+    streak: userRow.streak
+  };
 }
 
 function getUserPoints(userId) {
@@ -543,6 +644,40 @@ async function sendMessage(message, text) {
   }
 }
 
+async function sendStreakBonusAnnouncement(guild, userId, streak, bonusGranted) {
+  let streakChannel = guild.channels.cache.find(
+    (channel) => channel.type === ChannelType.GuildText && channel.name.toLowerCase() === 'racha'
+  );
+
+  if (!streakChannel) {
+    try {
+      await guild.channels.fetch();
+      streakChannel = guild.channels.cache.find(
+        (channel) => channel.type === ChannelType.GuildText && channel.name.toLowerCase() === 'racha'
+      );
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('No se pudo buscar el canal #racha:', error.message);
+      return;
+    }
+  }
+
+  if (!streakChannel) {
+    return;
+  }
+
+  const announcement =
+    `🔥 <@${userId}> alcanzó una racha de ${streak} días consecutivos ayudando al gremio!\n` +
+    `Bonus obtenido: +${bonusGranted} puntos.`;
+
+  try {
+    await streakChannel.send(announcement);
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('No se pudo enviar anuncio de racha:', error.message);
+  }
+}
+
 async function handleRankingCommand(message, isTotal) {
   const rows = getRankingRows(isTotal);
   const title = isTotal ? 'Ranking historico (Top 10)' : 'Ranking mensual (Top 10)';
@@ -772,6 +907,25 @@ async function handleActivityMessage(message) {
     return;
   }
 
+  const streakResult = processUserActivityStreak(store, payload.author.id);
+
+  if (streakResult.bonusGranted > 0) {
+    addPoints(payload.author.id, payload.author.username, streakResult.bonusGranted);
+  }
+
+  if (streakResult.streakUpdated || streakResult.bonusGranted > 0) {
+    saveData();
+  }
+
+  if (streakResult.bonusGranted > 0) {
+    await sendStreakBonusAnnouncement(
+      message.guild,
+      payload.author.id,
+      streakResult.streak,
+      streakResult.bonusGranted
+    );
+  }
+
   await syncProgressRolesAfterActivity(message.guild, payload);
   await sendMessage(message, buildSuccessResponse(payload));
 }
@@ -817,6 +971,7 @@ client.login(config.token).catch((error) => {
   console.error('No se pudo iniciar sesion en Discord:', error);
   process.exit(1);
 });
+
 
 
 
