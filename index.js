@@ -49,6 +49,9 @@ function createInitialData() {
     users: {},
     activity_logs: {},
     weekly_encargo_logs: {},
+    weekly_encargo_state: {
+      backfilled_week_key: null
+    },
     monthly_snapshots: [],
     monthly_resets: [],
     monthly_role_holders: {
@@ -123,6 +126,13 @@ function normalizeDataShape(rawData) {
 
   if (rawData.weekly_encargo_logs && typeof rawData.weekly_encargo_logs === 'object') {
     base.weekly_encargo_logs = rawData.weekly_encargo_logs;
+  }
+
+  if (rawData.weekly_encargo_state && typeof rawData.weekly_encargo_state === 'object') {
+    base.weekly_encargo_state = {
+      ...base.weekly_encargo_state,
+      ...rawData.weekly_encargo_state
+    };
   }
 
   if (Array.isArray(rawData.monthly_snapshots)) {
@@ -667,6 +677,10 @@ function pruneWeeklyEncargoLogs(date = new Date()) {
   return changed;
 }
 
+function hasBackfilledCurrentWeek(date = new Date()) {
+  return store.weekly_encargo_state?.backfilled_week_key === getWeeklyWindowInfo(date).weekKey;
+}
+
 function persistScannedEncargos(records, start, channel, guildId) {
   let changed = pruneWeeklyEncargoLogs(start);
   const weekKey = start.toISOString();
@@ -688,6 +702,11 @@ function persistScannedEncargos(records, start, channel, guildId) {
     };
     changed = true;
   });
+
+  if (store.weekly_encargo_state.backfilled_week_key !== weekKey) {
+    store.weekly_encargo_state.backfilled_week_key = weekKey;
+    changed = true;
+  }
 
   if (changed) {
     writeDataFile(store);
@@ -786,7 +805,7 @@ async function handleConteoCommands(message) {
   const { start, end } = getWeeklyWindowInfo(new Date());
   let records = getStoredWeeklyEncargoRecords(new Date());
 
-  if (records.length === 0) {
+  if (!hasBackfilledCurrentWeek(new Date())) {
     const scannedRecords = await scanChannelHistoryForEncargos(participationChannel, start, end);
     persistScannedEncargos(scannedRecords, start, participationChannel, message.guild.id);
     records = getStoredWeeklyEncargoRecords(new Date());
