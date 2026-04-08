@@ -886,12 +886,25 @@ async function handleCommand(message) {
     return true;
   }
 
+  if (command === 'sumarpuntos' || command === 'agregarpuntos') {
+    await handleAddPointsCommand(message, parts);
+    return true;
+  }
+
+  if (command === 'restarpuntos') {
+    await handleRemovePointsCommand(message, parts);
+    return true;
+  }
+
   if (command === 'reset-mensual') {
     await handleResetMensualCommand(message);
     return true;
   }
 
-  await sendMessage(message, 'Comando no reconocido. Usa !ranking, !ranking total, !puntos o !reset-mensual.');
+  await sendMessage(
+    message,
+    'Comando no reconocido. Usa !ranking, !ranking total, !puntos, !setpoints, !sumarpuntos, !restarpuntos o !reset-mensual.'
+  );
   return true;
 }
 
