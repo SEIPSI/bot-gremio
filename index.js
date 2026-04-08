@@ -750,6 +750,74 @@ async function handleSetPointsCommand(message, parts) {
   await sendMessage(message, `${getDisplayName(targetUser)} now has ${parsedPoints} points.`);
 }
 
+async function handleAddPointsCommand(message, parts) {
+  if (!isAdminById(message.author.id)) {
+    await sendMessage(message, 'No tienes permiso para usar !sumarpuntos.');
+    return;
+  }
+
+  const targetUser = message.mentions.users.first();
+  const rawPoints = parts[2];
+
+  if (!targetUser || typeof rawPoints === 'undefined') {
+    await sendMessage(message, 'Uso correcto: !sumarpuntos @user cantidad');
+    return;
+  }
+
+  const parsedPoints = Number.parseInt(rawPoints, 10);
+  if (!Number.isInteger(parsedPoints) || parsedPoints <= 0) {
+    await sendMessage(message, 'Uso correcto: !sumarpuntos @user cantidad');
+    return;
+  }
+
+  ensureUser(targetUser.id, getDisplayName(targetUser));
+  addPoints(targetUser.id, getDisplayName(targetUser), parsedPoints);
+  saveData();
+  await syncProgressRoleForUser(message.guild, targetUser.id);
+
+  const row = getUserPoints(targetUser.id);
+  await sendMessage(
+    message,
+    `Se agregaron ${parsedPoints} puntos a <@${targetUser.id}>.\nMensual: ${row ? row.monthly_points : 0} pts\nHistorico: ${row ? row.total_points : 0} pts`
+  );
+}
+
+async function handleRemovePointsCommand(message, parts) {
+  if (!isAdminById(message.author.id)) {
+    await sendMessage(message, 'No tienes permiso para usar !restarpuntos.');
+    return;
+  }
+
+  const targetUser = message.mentions.users.first();
+  const rawPoints = parts[2];
+
+  if (!targetUser || typeof rawPoints === 'undefined') {
+    await sendMessage(message, 'Uso correcto: !restarpuntos @user cantidad');
+    return;
+  }
+
+  const parsedPoints = Number.parseInt(rawPoints, 10);
+  if (!Number.isInteger(parsedPoints) || parsedPoints <= 0) {
+    await sendMessage(message, 'Uso correcto: !restarpuntos @user cantidad');
+    return;
+  }
+
+  ensureUser(targetUser.id, getDisplayName(targetUser));
+  const row = getUserPoints(targetUser.id);
+
+  row.total_points = Math.max(0, row.total_points - parsedPoints);
+  row.monthly_points = Math.max(0, row.monthly_points - parsedPoints);
+  row.updated_at = new Date().toISOString();
+
+  saveData();
+  await syncProgressRoleForUser(message.guild, targetUser.id);
+
+  await sendMessage(
+    message,
+    `Se restaron ${parsedPoints} puntos a <@${targetUser.id}>.\nMensual: ${row.monthly_points} pts\nHistorico: ${row.total_points} pts`
+  );
+}
+
 function buildTopThreeSummary(topRows) {
   if (topRows.length === 0) {
     return 'Top 3 del mes: sin participantes con puntos.';
