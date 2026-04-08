@@ -48,6 +48,7 @@ function createInitialData() {
   return {
     users: {},
     activity_logs: {},
+    weekly_encargo_logs: {},
     monthly_snapshots: [],
     monthly_resets: [],
     monthly_role_holders: {
@@ -118,6 +119,10 @@ function normalizeDataShape(rawData) {
 
   if (rawData.activity_logs && typeof rawData.activity_logs === 'object') {
     base.activity_logs = rawData.activity_logs;
+  }
+
+  if (rawData.weekly_encargo_logs && typeof rawData.weekly_encargo_logs === 'object') {
+    base.weekly_encargo_logs = rawData.weekly_encargo_logs;
   }
 
   if (Array.isArray(rawData.monthly_snapshots)) {
@@ -508,6 +513,7 @@ async function scanChannelHistoryForEncargos(channel, start, end) {
 
     results.push({
       messageId: String(message.id),
+      createdAt: message.createdAt.toISOString(),
       displayName: encargoName,
       normName: normalizeText(encargoName),
       people
@@ -589,6 +595,86 @@ function formatWindowDate(date) {
     minute: '2-digit',
     hour12: false
   }).format(date);
+}
+
+function getWeeklyWindowInfo(date = new Date()) {
+  const { start, end } = getReportingWindow(date);
+  return {
+    start,
+    end,
+    weekKey: start.toISOString()
+  };
+}
+
+function buildEncargoRecordFromPayload(payload) {
+  if (payload.activityType !== 'encargo') {
+    return null;
+  }
+
+  const displayName = extractEncargoName(payload.rawContent);
+  if (!displayName) {
+    return null;
+  }
+
+  const createdAt = new Date(payload.createdAt || Date.now());
+  const people = {
+    [payload.author.id]: payload.author.username
+  };
+
+  payload.mentions.forEach((mentionUser) => {
+    people[mentionUser.id] = mentionUser.username;
+  });
+
+  return {
+    message_id: payload.messageId,
+    channel_id: payload.channelId,
+    guild_id: payload.guildId,
+    created_at: createdAt.toISOString(),
+    week_key: getWeeklyWindowInfo(createdAt).weekKey,
+    display_name: displayName,
+    norm_name: normalizeText(displayName),
+    people
+  };
+}
+
+function getStoredWeeklyEncargoRecords(date = new Date()) {
+  const { weekKey } = getWeeklyWindowInfo(date);
+
+  return Object.values(store.weekly_encargo_logs || {})
+    .filter((record) => record && record.week_key === weekKey)
+    .map((record) => ({
+      messageId: record.message_id,
+      displayName: record.display_name,
+      normName: record.norm_name,
+      people: record.people || {}
+    }));
+}
+
+function persistScannedEncargos(records, start, channel, guildId) {
+  let changed = false;
+  const weekKey = start.toISOString();
+
+  records.forEach((record) => {
+    if (store.weekly_encargo_logs[record.messageId]) {
+      return;
+    }
+
+    store.weekly_encargo_logs[record.messageId] = {
+      message_id: record.messageId,
+      channel_id: channel.id,
+      guild_id: guildId,
+      created_at: record.createdAt,
+      week_key: weekKey,
+      display_name: record.displayName,
+      norm_name: record.normName,
+      people: record.people
+    };
+    changed = true;
+  });
+
+  if (changed) {
+    writeDataFile(store);
+  }
 }
 
 function formatConteoResponse(encargoName, names, start, end, sourceChannelName) {
@@ -680,8 +766,14 @@ async function handleConteoCommands(message) {
     return true;
   }
 
-  const { start, end } = getReportingWindow(new Date());
-  const records = await scanChannelHistoryForEncargos(participationChannel, start, end);
+  const { start, end } = getWeeklyWindowInfo(new Date());
+  let records = getStoredWeeklyEncargoRecords(new Date());
+
+  if (records.length === 0) {
+    const scannedRecords = await scanChannelHistoryForEncargos(participationChannel, start, end);
+    persistScannedEncargos(scannedRecords, start, participationChannel, message.guild.id);
+    records = getStoredWeeklyEncargoRecords(new Date());
+  }
 
   if (isListaMessage(content)) {
     const rows = buildWeeklyList(records);
@@ -1066,6 +1158,11 @@ function registerActivity(payload) {
     contains_armada: payload.containsArmada,
     created_at: new Date().toISOString()
   };
+
+  const encargoRecord = buildEncargoRecordFromPayload(payload);
+  if (encargoRecord) {
+    store.weekly_encargo_logs[payload.messageId] = encargoRecord;
+  }
 
   writeDataFile(store);
   return { ok: true };
@@ -1476,6 +1573,8 @@ async function handleActivityMessage(message) {
     messageId: message.id,
     channelId: message.channel.id,
     guildId: message.guild.id,
+    createdAt: message.createdAt.toISOString(),
+    rawContent: message.content || '',
     activityType: keywordInfo.detectedType,
     author: {
       id: message.author.id,
