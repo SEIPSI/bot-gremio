@@ -650,8 +650,25 @@ function getStoredWeeklyEncargoRecords(date = new Date()) {
     }));
 }
 
-function persistScannedEncargos(records, start, channel, guildId) {
+function pruneWeeklyEncargoLogs(date = new Date()) {
+  const { weekKey } = getWeeklyWindowInfo(date);
   let changed = false;
+
+  Object.keys(store.weekly_encargo_logs || {}).forEach((messageId) => {
+    const record = store.weekly_encargo_logs[messageId];
+    if (!record || record.week_key === weekKey) {
+      return;
+    }
+
+    delete store.weekly_encargo_logs[messageId];
+    changed = true;
+  });
+
+  return changed;
+}
+
+function persistScannedEncargos(records, start, channel, guildId) {
+  let changed = pruneWeeklyEncargoLogs(start);
   const weekKey = start.toISOString();
 
   records.forEach((record) => {
@@ -1161,6 +1178,7 @@ function registerActivity(payload) {
 
   const encargoRecord = buildEncargoRecordFromPayload(payload);
   if (encargoRecord) {
+    pruneWeeklyEncargoLogs(new Date(encargoRecord.created_at));
     store.weekly_encargo_logs[payload.messageId] = encargoRecord;
   }
 
