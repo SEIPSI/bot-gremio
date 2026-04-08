@@ -628,11 +628,11 @@ function buildEncargoRecordFromPayload(payload) {
 
   const createdAt = new Date(payload.createdAt || Date.now());
   const people = {
-    [payload.author.id]: payload.author.username
+    [payload.author.id]: payload.author.displayName || payload.author.username
   };
 
   payload.mentions.forEach((mentionUser) => {
-    people[mentionUser.id] = mentionUser.username;
+    people[mentionUser.id] = mentionUser.displayName || mentionUser.username;
   });
 
   return {
@@ -686,11 +686,7 @@ function persistScannedEncargos(records, start, channel, guildId) {
   const weekKey = start.toISOString();
 
   records.forEach((record) => {
-    if (store.weekly_encargo_logs[record.messageId]) {
-      return;
-    }
-
-    store.weekly_encargo_logs[record.messageId] = {
+    const nextRecord = {
       message_id: record.messageId,
       channel_id: channel.id,
       guild_id: guildId,
@@ -700,7 +696,12 @@ function persistScannedEncargos(records, start, channel, guildId) {
       norm_name: record.normName,
       people: record.people
     };
-    changed = true;
+
+    const previousRecord = store.weekly_encargo_logs[record.messageId];
+    if (!previousRecord || JSON.stringify(previousRecord) !== JSON.stringify(nextRecord)) {
+      store.weekly_encargo_logs[record.messageId] = nextRecord;
+      changed = true;
+    }
   });
 
   if (store.weekly_encargo_state.backfilled_week_key !== weekKey) {
@@ -870,14 +871,16 @@ function getValidMentions(message) {
     }
 
     if (!uniqueMentions.has(user.id)) {
-      uniqueMentions.set(user.id, user);
+      const member = message.mentions.members?.get(user.id);
+      uniqueMentions.set(user.id, {
+        id: user.id,
+        username: getDisplayName(user),
+        displayName: member?.displayName || getDisplayName(user)
+      });
     }
   });
 
-  return [...uniqueMentions.values()].map((user) => ({
-    id: user.id,
-    username: getDisplayName(user)
-  }));
+  return [...uniqueMentions.values()];
 }
 
 function isAdminById(userId) {
@@ -1616,6 +1619,7 @@ async function handleActivityMessage(message) {
     author: {
       id: message.author.id,
       username: getDisplayName(message.author),
+      displayName: message.member?.displayName || getDisplayName(message.author),
       points: authorPoints
     },
     mentions: validMentions,
