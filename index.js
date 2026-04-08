@@ -8,7 +8,6 @@ const MAIN_KEYWORDS = Object.freeze({
   encargo: '#encargo',
   mazmorra: '#mazmorra',
   ayuda: '#ayuda',
-  rookie: '#rookie',
   sorteo: '#sorteo'
 });
 
@@ -18,7 +17,6 @@ const POINT_RULES = Object.freeze({
   encargo: { author: 8, mention: 8, armadaBonus: 2 },
   mazmorra: { author: 5, mention: 5, armadaBonus: 2 },
   ayuda: { author: 4, mention: 4, armadaBonus: 2 },
-  rookie: { author: 6, mention: 6, armadaBonus: 2 },
   sorteo: { author: 4, mention: 0, armadaBonus: 0 }
 });
 
@@ -952,10 +950,10 @@ async function handleActivityMessage(message) {
   }
 
   const validMentions = getValidMentions(message);
-  const requiresMention = keywordInfo.detectedType === 'rookie' || keywordInfo.detectedType === 'sorteo';
+  const requiresMention = keywordInfo.detectedType === 'sorteo';
 
   if (requiresMention && validMentions.length === 0) {
-    await sendMessage(message, 'Registro invalido: #rookie y #sorteo requieren al menos una mencion valida.');
+    await sendMessage(message, 'Registro invalido: #sorteo requiere al menos una mencion valida.');
     return;
   }
 
