@@ -86,6 +86,9 @@ function loadConfig() {
     adminUserIds: parseIdSet(process.env.ADMIN_USER_IDS),
     protectedRoleIds: parseIdSet(process.env.PROTECTED_ROLE_IDS),
     channelIdParticipacion: requiredEnv('CHANNEL_ID_PARTICIPACION'),
+    channelIdConteoEncargos: process.env.CHANNEL_ID_CONTEO_ENCARGOS?.trim() || null,
+    reportTimezone: process.env.REPORT_TIMEZONE?.trim() || 'Europe/Berlin',
+    maxHistoryMessages: Number.parseInt(process.env.MAX_HISTORY_MESSAGES || '1500', 10) || 1500,
     progressRoles: {
       iniciado: requiredEnv('ROLE_ID_INICIADO'),
       miembro: requiredEnv('ROLE_ID_MIEMBRO'),
@@ -200,6 +203,511 @@ function parseMainKeyword(content) {
 
 function hasBonusKeyword(content) {
   return countOccurrences(content, BONUS_KEYWORD) > 0;
+}
+
+function normalizeText(value) {
+  return (value || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function splitTextIntoChunks(text, maxLength = 1800) {
+  if (text.length <= maxLength) {
+    return [text];
+  }
+
+  const chunks = [];
+  let current = '';
+
+  text.split('\n').forEach((line) => {
+    const candidate = `${current}${line}\n`;
+    if (candidate.length > maxLength) {
+      if (current.trim()) {
+        chunks.push(current.trimEnd());
+      }
+      current = `${line}\n`;
+      return;
+    }
+
+    current = candidate;
+  });
+
+  if (current.trim()) {
+    chunks.push(current.trimEnd());
+  }
+
+  return chunks;
+}
+
+function stripUserMentions(text) {
+  return (text || '').replace(/<@!?\d+>/g, '');
+}
+
+function extractEncargoName(text) {
+  if (!/^\s*#encargo\b/i.test(text || '')) {
+    return null;
+  }
+
+  let cleaned = stripUserMentions(text).trim();
+  cleaned = cleaned.replace(/^\s*#encargo\b/i, '').trim();
+  cleaned = cleaned.replace(/^(?:#\S+\s+)+/, '').trim();
+  cleaned = cleaned.replace(/^\[\d{1,2}:\d{2}\]\s*/, '').trim();
+
+  const finishedMatch = cleaned.match(/has\s+terminado\s+el\s+encargo\s+(.+)$/i);
+  if (finishedMatch) {
+    cleaned = finishedMatch[1].trim();
+  }
+
+  cleaned = cleaned.replace(/^encargo\s+/i, '').trim();
+  cleaned = cleaned.replace(/\s+/g, ' ').trim();
+
+  if (cleaned.includes('.')) {
+    cleaned = cleaned.split('.', 1)[0].trim();
+  }
+
+  cleaned = cleaned.split(/[!?]/, 1)[0].trim();
+
+  const originalTokens = cleaned.split(/\s+/).filter(Boolean);
+  const startIndex = originalTokens.findIndex((token) => {
+    const normalized = normalizeText(token);
+    return normalized === 'expedicion' || normalized === 'regulacion';
+  });
+
+  if (startIndex >= 0) {
+    cleaned = originalTokens.slice(startIndex).join(' ').trim();
+  }
+
+  cleaned = cleaned.replace(/\s+/g, ' ').trim().replace(/^[\s\-:;,.]+|[\s\-:;,.]+$/g, '');
+  return cleaned || null;
+}
+
+function cleanConteoQueryText(text) {
+  let cleaned = stripUserMentions(text).trim();
+  cleaned = cleaned.replace(/^\s*#conteo\b/i, '').trim();
+  cleaned = cleaned.replace(/^\[\d{1,2}:\d{2}\]\s*/, '').trim();
+
+  const finishedMatch = cleaned.match(/has\s+terminado\s+el\s+encargo\s+(.+)$/i);
+  if (finishedMatch) {
+    cleaned = finishedMatch[1].trim();
+  }
+
+  cleaned = cleaned.replace(/^encargo\s+/i, '').trim();
+  cleaned = cleaned.replace(/\s+/g, ' ').trim().replace(/^[\s\-:;,.]+|[\s\-:;,.]+$/g, '');
+  return cleaned || null;
+}
+
+function parseConteoMessage(content) {
+  const match = (content || '').match(/^\s*#conteo\s+(.+?)\s*$/i);
+  if (!match) {
+    return null;
+  }
+
+  return cleanConteoQueryText(match[1]);
+}
+
+function isListaMessage(content) {
+  return /^\s*#lista\s*$/i.test(content || '');
+}
+
+function createTimeZoneFormatter(timeZone) {
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    hour12: false,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    weekday: 'short'
+  });
+}
+
+function getTimeZoneParts(date, timeZone) {
+  const formatter = createTimeZoneFormatter(timeZone);
+  const mapped = {};
+
+  formatter.formatToParts(date).forEach((part) => {
+    if (part.type !== 'literal') {
+      mapped[part.type] = part.value;
+    }
+  });
+
+  const weekdayMap = {
+    Sun: 0,
+    Mon: 1,
+    Tue: 2,
+    Wed: 3,
+    Thu: 4,
+    Fri: 5,
+    Sat: 6
+  };
+
+  return {
+    year: Number.parseInt(mapped.year, 10),
+    month: Number.parseInt(mapped.month, 10),
+    day: Number.parseInt(mapped.day, 10),
+    hour: Number.parseInt(mapped.hour, 10),
+    minute: Number.parseInt(mapped.minute, 10),
+    second: Number.parseInt(mapped.second, 10),
+    weekday: weekdayMap[mapped.weekday]
+  };
+}
+
+function getTimeZoneOffsetMs(date, timeZone) {
+  const parts = getTimeZoneParts(date, timeZone);
+  const zonedAsUtc = Date.UTC(
+    parts.year,
+    parts.month - 1,
+    parts.day,
+    parts.hour,
+    parts.minute,
+    parts.second
+  );
+
+  return zonedAsUtc - date.getTime();
+}
+
+function makeZonedDate(timeZone, year, month, day, hour = 0, minute = 0, second = 0) {
+  const utcGuess = Date.UTC(year, month - 1, day, hour, minute, second);
+  let result = new Date(utcGuess - getTimeZoneOffsetMs(new Date(utcGuess), timeZone));
+  const correctedOffset = getTimeZoneOffsetMs(result, timeZone);
+  result = new Date(utcGuess - correctedOffset);
+  return result;
+}
+
+function addDaysUtc(date, days) {
+  return new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
+}
+
+function getReportingWindow(now = new Date()) {
+  const timeZone = config.reportTimezone;
+  const zonedNowParts = getTimeZoneParts(now, timeZone);
+  const daysSinceTuesday = (zonedNowParts.weekday - 2 + 7) % 7;
+  const currentDayStart = makeZonedDate(
+    timeZone,
+    zonedNowParts.year,
+    zonedNowParts.month,
+    zonedNowParts.day,
+    0,
+    0,
+    0
+  );
+
+  const thisTuesdayStart = addDaysUtc(currentDayStart, -daysSinceTuesday);
+  const tuesdayWindowStart = makeZonedDate(
+    timeZone,
+    getTimeZoneParts(thisTuesdayStart, timeZone).year,
+    getTimeZoneParts(thisTuesdayStart, timeZone).month,
+    getTimeZoneParts(thisTuesdayStart, timeZone).day,
+    11,
+    0,
+    0
+  );
+  const tuesdayMorningEnd = makeZonedDate(
+    timeZone,
+    getTimeZoneParts(thisTuesdayStart, timeZone).year,
+    getTimeZoneParts(thisTuesdayStart, timeZone).month,
+    getTimeZoneParts(thisTuesdayStart, timeZone).day,
+    8,
+    0,
+    0
+  );
+
+  if (zonedNowParts.weekday === 2 && now < tuesdayWindowStart) {
+    return {
+      start: addDaysUtc(tuesdayWindowStart, -7),
+      end: tuesdayMorningEnd
+    };
+  }
+
+  let start = tuesdayWindowStart;
+  if (now < start) {
+    start = addDaysUtc(start, -7);
+  }
+
+  const nextWeek = addDaysUtc(start, 7);
+  const nextWeekParts = getTimeZoneParts(nextWeek, timeZone);
+  const end = makeZonedDate(
+    timeZone,
+    nextWeekParts.year,
+    nextWeekParts.month,
+    nextWeekParts.day,
+    8,
+    0,
+    0
+  );
+
+  return { start, end };
+}
+
+async function scanChannelHistoryForEncargos(channel, start, end) {
+  const results = [];
+  let scannedCount = 0;
+
+  // eslint-disable-next-line no-console
+  console.log(`[SCAN] Canal leido: ${channel.name}`);
+  // eslint-disable-next-line no-console
+  console.log(`[SCAN] Ventana: ${start.toISOString()} -> ${end.toISOString()}`);
+  // eslint-disable-next-line no-console
+  console.log(`[SCAN] Limite de mensajes: ${config.maxHistoryMessages}`);
+
+  const collectedMessages = [];
+  let beforeId = null;
+
+  while (collectedMessages.length < config.maxHistoryMessages) {
+    const remaining = config.maxHistoryMessages - collectedMessages.length;
+    const batch = await channel.messages.fetch({
+      limit: Math.min(100, remaining),
+      ...(beforeId ? { before: beforeId } : {})
+    });
+
+    if (batch.size === 0) {
+      break;
+    }
+
+    const batchMessages = [...batch.values()];
+    collectedMessages.push(...batchMessages);
+    beforeId = batchMessages[batchMessages.length - 1].id;
+
+    if (batch.size < 100) {
+      break;
+    }
+  }
+
+  const orderedMessages = collectedMessages.sort((a, b) => a.createdTimestamp - b.createdTimestamp);
+
+  orderedMessages.forEach((message) => {
+    scannedCount += 1;
+
+    if (message.author.bot) {
+      return;
+    }
+
+    if (message.createdAt <= start || message.createdAt >= end) {
+      return;
+    }
+
+    const encargoName = extractEncargoName(message.content);
+    if (!encargoName) {
+      return;
+    }
+
+    const people = {};
+    people[String(message.author.id)] = message.member?.displayName || getDisplayName(message.author);
+
+    message.mentions.users.forEach((user) => {
+      const member = message.guild.members.cache.get(user.id);
+      people[String(user.id)] = member?.displayName || getDisplayName(user);
+    });
+
+    results.push({
+      messageId: String(message.id),
+      displayName: encargoName,
+      normName: normalizeText(encargoName),
+      people
+    });
+  });
+
+  // eslint-disable-next-line no-console
+  console.log(`[SCAN] Mensajes revisados: ${scannedCount}`);
+  // eslint-disable-next-line no-console
+  console.log(`[SCAN] Encargos detectados: ${results.length}`);
+
+  return results;
+}
+
+function buildExactConteo(records, cleanedQuery) {
+  const queryNorm = normalizeText(cleanedQuery);
+  const matched = records.filter((record) => record.normName === queryNorm);
+
+  if (matched.length === 0) {
+    return { encargoName: null, names: [] };
+  }
+
+  const uniquePeople = new Map();
+  matched.forEach((record) => {
+    Object.entries(record.people).forEach(([userId, userName]) => {
+      uniquePeople.set(userId, userName);
+    });
+  });
+
+  const names = [...uniquePeople.values()].sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+  const encargoName = [...new Set(matched.map((record) => record.displayName))].sort((a, b) => {
+    if (a.length !== b.length) {
+      return a.length - b.length;
+    }
+    return a.localeCompare(b, 'es', { sensitivity: 'base' });
+  })[0];
+
+  return { encargoName, names };
+}
+
+function buildWeeklyList(records) {
+  const grouped = new Map();
+
+  records.forEach((record) => {
+    if (!grouped.has(record.normName)) {
+      grouped.set(record.normName, {
+        displayNames: [],
+        people: new Map()
+      });
+    }
+
+    const entry = grouped.get(record.normName);
+    entry.displayNames.push(record.displayName);
+
+    Object.entries(record.people).forEach(([userId, userName]) => {
+      entry.people.set(userId, userName);
+    });
+  });
+
+  return [...grouped.values()]
+    .map((entry) => ({
+      encargoName: [...new Set(entry.displayNames)].sort((a, b) => {
+        if (a.length !== b.length) {
+          return a.length - b.length;
+        }
+        return a.localeCompare(b, 'es', { sensitivity: 'base' });
+      })[0],
+      totalPersonas: entry.people.size
+    }))
+    .sort((a, b) => a.encargoName.localeCompare(b.encargoName, 'es', { sensitivity: 'base' }));
+}
+
+function formatWindowDate(date) {
+  return new Intl.DateTimeFormat('es-ES', {
+    timeZone: config.reportTimezone,
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  }).format(date);
+}
+
+function formatConteoResponse(encargoName, names, start, end, sourceChannelName) {
+  const lines = [
+    '**Conteo**',
+    `Canal leido: ${sourceChannelName}`,
+    `Coincidencia exacta: ${encargoName}`,
+    `Ventana: ${formatWindowDate(start)} -> ${formatWindowDate(end)} (${config.reportTimezone})`,
+    `Personas distintas: ${names.length}`,
+    ''
+  ];
+
+  if (names.length === 0) {
+    lines.push('No la ha hecho nadie.');
+  } else {
+    lines.push('Personas:');
+    names.forEach((name) => {
+      lines.push(`- ${name}`);
+    });
+  }
+
+  return lines.join('\n');
+}
+
+function formatWeeklyListResponse(rows, start, end, sourceChannelName) {
+  const lines = [
+    '**Lista semanal**',
+    `Canal leido: ${sourceChannelName}`,
+    `Ventana: ${formatWindowDate(start)} -> ${formatWindowDate(end)} (${config.reportTimezone})`,
+    ''
+  ];
+
+  if (rows.length === 0) {
+    lines.push('No encontre encargos en esa ventana.');
+    return lines.join('\n');
+  }
+
+  rows.forEach((row, index) => {
+    lines.push(`${index + 1}. ${row.encargoName} - ${row.totalPersonas} personas`);
+  });
+
+  return lines.join('\n');
+}
+
+async function sendChunkedReply(message, text) {
+  const chunks = splitTextIntoChunks(text);
+
+  for (const [index, chunk] of chunks.entries()) {
+    if (index === 0) {
+      await sendMessage(message, chunk);
+      continue;
+    }
+
+    await message.channel.send(chunk);
+  }
+}
+
+function isConteoCommandAllowedInChannel(channelId) {
+  if (channelId === config.channelIdParticipacion) {
+    return true;
+  }
+
+  return Boolean(config.channelIdConteoEncargos && channelId === config.channelIdConteoEncargos);
+}
+
+async function handleConteoCommands(message) {
+  const content = (message.content || '').trim();
+
+  if (!isListaMessage(content) && !parseConteoMessage(content)) {
+    return false;
+  }
+
+  if (!isConteoCommandAllowedInChannel(message.channel.id)) {
+    return false;
+  }
+
+  let participationChannel = message.guild.channels.cache.get(config.channelIdParticipacion);
+  if (!participationChannel) {
+    try {
+      participationChannel = await message.guild.channels.fetch(config.channelIdParticipacion);
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('No se pudo obtener el canal de participacion para conteo:', error.message);
+    }
+  }
+
+  if (!participationChannel || participationChannel.type !== ChannelType.GuildText) {
+    await sendMessage(message, 'No encuentro el canal de participacion configurado para leer encargos.');
+    return true;
+  }
+
+  const { start, end } = getReportingWindow(new Date());
+  const records = await scanChannelHistoryForEncargos(participationChannel, start, end);
+
+  if (isListaMessage(content)) {
+    const rows = buildWeeklyList(records);
+    await sendChunkedReply(
+      message,
+      formatWeeklyListResponse(rows, start, end, participationChannel.name)
+    );
+    return true;
+  }
+
+  const cleanedQuery = parseConteoMessage(content);
+  if (!cleanedQuery) {
+    return false;
+  }
+
+  const { encargoName, names } = buildExactConteo(records, cleanedQuery);
+  if (!encargoName) {
+    await sendMessage(message, 'No encontre coincidencia exacta para ese nombre.');
+    return true;
+  }
+
+  await sendChunkedReply(
+    message,
+    formatConteoResponse(encargoName, names, start, end, participationChannel.name)
+  );
+  return true;
 }
 
 function getCurrentDayKey() {
@@ -1021,6 +1529,12 @@ const client = new Client({
 client.once('ready', () => {
   // eslint-disable-next-line no-console
   console.log(`Bot conectado como ${client.user.tag}`);
+  // eslint-disable-next-line no-console
+  console.log(`Canal de participacion: ${config.channelIdParticipacion}`);
+  // eslint-disable-next-line no-console
+  console.log(
+    `Canal de conteo de encargos: ${config.channelIdConteoEncargos || 'usa solo el canal de participacion'}`
+  );
 });
 
 client.on('messageCreate', async (message) => {
@@ -1034,6 +1548,11 @@ client.on('messageCreate', async (message) => {
 
   const commandHandled = await handleCommand(message);
   if (commandHandled) {
+    return;
+  }
+
+  const conteoHandled = await handleConteoCommands(message);
+  if (conteoHandled) {
     return;
   }
 
